@@ -1,15 +1,17 @@
 ﻿# subsetMatrix
 
-`subsetMatrix` is a small Python utility for generating subset membership matrices.
+`subsetMatrix` is a small Python library for generating, selecting, and materializing subsets from an observation set.
 
-Given a set with `n` observations, the project generates a binary matrix representing the non-empty and non-full subsets of that set.
+It starts with a simple idea:
 
-Each row represents one subset.
+> Given `n` observations, generate a binary matrix where each row represents one subset.
+
 Each column represents one observation.
+Each row represents one subset.
 A value of `1` means the observation belongs to that subset.
 A value of `0` means it does not.
 
-For example, with `n = 3`:
+For `n = 3`, the generated matrix is:
 
 ```text
 [[1 0 0]
@@ -26,87 +28,76 @@ The empty subset `[0 0 0]` and the full subset `[1 1 1]` are excluded by default
 
 ## Why this exists
 
-Many analytical workflows need to explore combinations of observations, features, points, candidates, or entities.
+Many workflows need to explore combinations of observations, points, features, candidates, or records.
 
-`subsetMatrix` provides a deterministic way to represent those combinations as a matrix.
+`subsetMatrix` provides a deterministic substrate for that kind of work.
 
-This can be useful for:
+It can be useful for:
 
 * combinatorial analysis;
-* subset-based experimentation;
-* model candidate generation;
-* sampling strategies;
-* subset scoring;
-* path or anchor exploration;
-* matrix-based transformations;
-* research prototypes involving combinations of observations.
+* subset generation;
+* fixed-size subset selection;
+* dataset slicing;
+* candidate generation;
+* research prototypes;
+* model experimentation;
+* matrix-based workflows;
+* observation-subset analysis.
 
-The project is intentionally small. It only generates the subset substrate. It does not impose any scoring, modeling, or interpretation layer.
+The library intentionally keeps interpretation out of the core.
+
+It does not decide what a subset means.
+It only helps generate, select, and materialize subsets.
 
 ---
 
-## Core idea
+## Core behavior
 
-For `n` observations, the full number of possible subsets is:
+For `n` observations, there are:
 
 ```text
 2^n
 ```
 
-This project excludes the empty and full subsets, so the default number of generated rows is:
+possible subsets.
+
+`subsetMatrix` excludes the empty and full subsets, so the generated matrix has:
 
 ```text
 2^n - 2
 ```
 
-The matrix shape is therefore:
+rows.
+
+The matrix shape is:
 
 ```text
 (2^n - 2, n)
 ```
 
-Example:
-
-```python
-from subsetmatrix.engine import generateMatrix
-
-matrix = generateMatrix(3)
-
-print(matrix)
-```
-
-Output:
+Examples:
 
 ```text
-[[1 0 0]
- [0 1 0]
- [0 0 1]
- [1 1 0]
- [1 0 1]
- [0 1 1]]
+n = 3  → 6 rows
+n = 4  → 14 rows
+n = 20 → 1,048,574 rows
 ```
+
+Rows are grouped by subset size `k`.
+
+For `n = 4`, rows are ordered as:
+
+```text
+k = 1 → subsets with one active observation
+k = 2 → subsets with two active observations
+k = 3 → subsets with three active observations
+```
+
+The groups `k = 0` and `k = n` are skipped.
 
 ---
 
-## Ordering
-
-Rows are grouped by subset size.
-
-For `n = 4`, the generated rows are grouped as:
-
-```text
-k = 1  → subsets with one active observation
-k = 2  → subsets with two active observations
-k = 3  → subsets with three active observations
-```
-
-The empty group `k = 0` and the full group `k = n` are skipped.
-
-This makes the output easier to analyze by subset cardinality.
-
----
-
-## Installation for local development
+## Installation
 
 Clone the repository:
 
@@ -115,7 +106,7 @@ git clone https://github.com/EngDornelles/subsetMatrix.git
 cd subsetMatrix
 ```
 
-Create and activate a virtual environment.
+Create a virtual environment.
 
 On Windows PowerShell:
 
@@ -139,41 +130,165 @@ py -m pip install pytest
 Run tests:
 
 ```powershell
-py -m pytest
+py -m pytest -v
 ```
 
 ---
 
-## Usage
+## Quick start
 
-### Generate a subset membership matrix
+### Generate a subset matrix
 
 ```python
 from subsetmatrix.engine import generateMatrix
 
-matrix = generateMatrix(4)
+matrix = generateMatrix(3)
 
 print(matrix)
-print(matrix.shape)
 ```
 
-Expected shape:
+Output:
 
 ```text
-(14, 4)
-```
-
-Because:
-
-```text
-2^4 - 2 = 14
+[[1 0 0]
+ [0 1 0]
+ [0 0 1]
+ [1 1 0]
+ [1 0 1]
+ [0 1 1]]
 ```
 
 ---
 
-### Generate masks for subsets of fixed size
+## User-facing dataset workflow
 
-The project also exposes a generator for masks with exactly `k` active observations.
+The easiest way to use the library is through `ObservationSet`.
+
+```python
+from subsetmatrix.dataset_payload import ObservationSet
+
+obs = ObservationSet(
+    {
+        "Y": [10, 20, 30, 40],
+        "X": ["A", "B", "C", "D"],
+    }
+)
+
+subsets = obs.get_subsets(2)
+
+print(subsets)
+```
+
+Output:
+
+```python
+[
+    [["A", 10], ["B", 20]],
+    [["A", 10], ["C", 30]],
+    [["B", 20], ["C", 30]],
+    [["A", 10], ["D", 40]],
+    [["B", 20], ["D", 40]],
+    [["C", 30], ["D", 40]],
+]
+```
+
+`X` contains labels.
+`Y` contains observations.
+
+If `X` is not provided, labels are generated automatically.
+
+```python
+obs = ObservationSet(
+    {
+        "Y": [10, 20, 30, 40],
+    }
+)
+
+print(obs.X)
+```
+
+Output:
+
+```python
+[1, 2, 3, 4]
+```
+
+By default, generated labels are one-based.
+
+To use zero-based labels:
+
+```python
+obs = ObservationSet(
+    {
+        "Y": [10, 20, 30, 40],
+    },
+    indexing_as_one=False,
+)
+
+print(obs.X)
+```
+
+Output:
+
+```python
+[0, 1, 2, 3]
+```
+
+---
+
+## Selecting subset windows by `k`
+
+You can extract only the rows for a specific subset size.
+
+```python
+from subsetmatrix.engine import generateMatrix
+from subsetmatrix.selecting_subsets import extract_k_window
+
+matrix = generateMatrix(4)
+
+k2_matrix = extract_k_window(matrix, 2)
+
+print(k2_matrix)
+```
+
+Output:
+
+```text
+[[1 1 0 0]
+ [1 0 1 0]
+ [0 1 1 0]
+ [1 0 0 1]
+ [0 1 0 1]
+ [0 0 1 1]]
+```
+
+You can also extract multiple `k` groups:
+
+```python
+selected = extract_k_window(matrix, [1, 3])
+```
+
+The list is normalized, sorted, and deduplicated.
+
+So this:
+
+```python
+extract_k_window(matrix, [3, 1, 1])
+```
+
+behaves like:
+
+```python
+extract_k_window(matrix, [1, 3])
+```
+
+---
+
+## Fixed-size mask generation
+
+`subsetMatrix` uses integer masks internally to generate subset rows.
+
+You can generate masks directly for a fixed subset size `k`:
 
 ```python
 from subsetmatrix.engine import iter_k_masks
@@ -182,24 +297,35 @@ for mask in iter_k_masks(n=4, k=2):
     print(mask)
 ```
 
-Each mask is an integer representation of a subset.
-
-For example:
+Output:
 
 ```text
-3  → 0011
-5  → 0101
-6  → 0110
-9  → 1001
-10 → 1010
-12 → 1100
+3
+5
+6
+9
+10
+12
 ```
 
-This is useful because integer masks are compact and can be expanded into matrix rows later.
+Those masks correspond to:
+
+```text
+0011
+0101
+0110
+1001
+1010
+1100
+```
+
+Each mask has exactly two active bits.
 
 ---
 
-### Check mask cardinality
+## Cardinality
+
+You can check how many active observations a mask contains:
 
 ```python
 from subsetmatrix.engine import cardinality
@@ -225,83 +351,76 @@ has two active bits.
 
 ## Current API
 
-```python
-generateMatrix(n: int)
-```
+### `generateMatrix(n: int)`
 
-Generates the full non-empty, non-full subset membership matrix for `n` observations.
+Generates the full non-empty, non-full subset membership matrix.
 
 ```python
-iter_k_masks(n: int, k: int)
+from subsetmatrix.engine import generateMatrix
+
+matrix = generateMatrix(4)
 ```
+
+For `n = 4`, the shape is:
+
+```text
+(14, 4)
+```
+
+---
+
+### `iter_k_masks(n: int, k: int)`
 
 Yields integer masks with exactly `k` active observations.
 
 ```python
-cardinality(mask: int)
-```
+from subsetmatrix.engine import iter_k_masks
 
-Returns the number of active bits in a mask.
+masks = list(iter_k_masks(4, 2))
+```
 
 ---
 
-## Design notes
+### `cardinality(mask: int)`
 
-`subsetMatrix` is based on the idea that subset membership can be represented compactly as integer masks.
+Returns how many active bits exist in a mask.
 
-A dense matrix is useful for inspection and downstream numerical workflows, but it can become large quickly.
+```python
+from subsetmatrix.engine import cardinality
 
-For example:
-
-```text
-n = 20 → 1,048,574 rows
-n = 26 → 67,108,862 rows
+cardinality(12)
 ```
-
-Because of that, future versions may expand mask-first workflows, chunked generation, storage helpers, and memory estimation tools.
-
-The current version focuses on a simple, deterministic, inspectable matrix generator.
 
 ---
 
-## Development status
+### `extract_k_window(matrix, k)`
 
-This project is in early development.
+Extracts rows for one or more subset sizes.
 
-Current focus:
+```python
+from subsetmatrix.selecting_subsets import extract_k_window
 
-* deterministic subset matrix generation;
-* cardinality-grouped ordering;
-* mask-based generation;
-* small and readable implementation;
-* local development and testing.
-
-Planned improvements may include:
-
-* snake_case API aliases;
-* chunked matrix generation;
-* mask-only output;
-* memory estimation helpers;
-* optional export formats;
-* optional packed storage;
-* better documentation and examples.
+k2 = extract_k_window(matrix, 2)
+mixed = extract_k_window(matrix, [1, 3])
+```
 
 ---
 
-## Testing
+### `ObservationSet(points).get_subsets(k)`
 
-Run:
+Materializes actual dataset subsets.
 
-```powershell
-py -m pytest
-```
+```python
+from subsetmatrix.dataset_payload import ObservationSet
 
-Current tests validate basic matrix shapes, including:
+obs = ObservationSet(
+    {
+        "Y": [10, 20, 30, 40],
+        "X": ["A", "B", "C", "D"],
+    }
+)
 
-```text
-n = 3  → shape (6, 3)
-n = 4  → shape (14, 4)
-n = 20 → shape (1,048,574, 20)
+obs.get_subsets(2)
 ```
 
 ---
@@ -310,19 +429,159 @@ n = 20 → shape (1,048,574, 20)
 
 ```text
 subsetMatrix/
+├── LICENSE
 ├── README.md
 ├── pyproject.toml
 ├── src/
 │   └── subsetmatrix/
 │       ├── __init__.py
-│       └── engine.py
+│       ├── engine.py
+│       ├── selecting_subsets.py
+│       └── dataset_payload.py
 └── tests/
-    └── test_engine.py
+    ├── test_engine.py
+    ├── test_selecting_subsets.py
+    └── test_dataset_payload.py
 ```
 
 ---
 
-## Notes on naming
+## Design notes
+
+### Matrix generation
+
+The generated matrix is a binary membership matrix.
+
+Each row is a subset.
+Each column is an observation.
+
+Example:
+
+```text
+[1 0 1 0]
+```
+
+means:
+
+```text
+include observation 0
+exclude observation 1
+include observation 2
+exclude observation 3
+```
+
+---
+
+### Cardinality grouping
+
+Rows are grouped by subset size `k`.
+
+This makes it possible to extract all subsets of a specific size without scanning the whole matrix.
+
+For example, if you only need subsets with `k = 3`, you can extract only that window.
+
+---
+
+### Empty and full subsets
+
+The empty subset and full subset are excluded.
+
+They are usually not useful for workflows where subsets are being compared, sampled, scored, or transformed.
+
+Excluded rows:
+
+```text
+[0 0 0 ... 0]
+[1 1 1 ... 1]
+```
+
+---
+
+### Dense matrix warning
+
+The full dense matrix grows quickly.
+
+```text
+n = 20 → 1,048,574 rows
+n = 26 → 67,108,862 rows
+```
+
+Future versions may add:
+
+* mask-only output;
+* chunked generation;
+* memory estimation;
+* packed storage;
+* optional export formats;
+* lazy payload materialization.
+
+The current version prioritizes clarity and deterministic behavior.
+
+---
+
+## Testing
+
+Run:
+
+```powershell
+py -m pytest -v
+```
+
+Current test coverage validates:
+
+* matrix shape;
+* exact output for `n = 3`;
+* cardinality grouping;
+* exclusion of empty and full rows;
+* invalid `n`;
+* k-window extraction;
+* sorted and deduplicated `k` lists;
+* rejection of invalid `k`;
+* NumPy integer support;
+* dataset payload materialization;
+* default generated labels;
+* custom labels;
+* invalid input handling.
+
+Example current test result:
+
+```text
+18 passed
+```
+
+---
+
+## Development status
+
+`subsetMatrix` is in early development.
+
+Current stable layers:
+
+```text
+engine.py
+→ generate subset matrix
+
+selecting_subsets.py
+→ extract k-window slices
+
+dataset_payload.py
+→ materialize dataset subsets
+```
+
+Planned improvements may include:
+
+* snake_case aliases;
+* chunked matrix generation;
+* mask-first public workflows;
+* memory estimation helpers;
+* optional pandas helpers;
+* optional export utilities;
+* expanded documentation;
+* performance benchmarks.
+
+---
+
+## Naming
 
 The GitHub repository is named:
 
@@ -330,21 +589,25 @@ The GitHub repository is named:
 subsetMatrix
 ```
 
-The Python import package uses lowercase naming:
+The Python package is imported as:
 
 ```python
 import subsetmatrix
 ```
 
-This follows normal Python package naming conventions while preserving the repository name.
+This follows Python package naming conventions while preserving the repository’s public name.
 
 ---
 
 ## License
 
-License not defined yet.
+This project is licensed under the MIT License.
 
-Before using this project in production or redistributing it, check the repository license.
+See:
+
+```text
+LICENSE
+```
 
 ---
 
@@ -353,26 +616,3 @@ Before using this project in production or redistributing it, check the reposito
 Created by Lucas Dornelles Cherobim.
 
 GitHub: [EngDornelles](https://github.com/EngDornelles)
-
----
-
-## Minimal example
-
-```python
-from subsetmatrix.engine import generateMatrix
-
-if __name__ == "__main__":
-    matrix = generateMatrix(3)
-    print(matrix)
-```
-
-Output:
-
-```text
-[[1 0 0]
- [0 1 0]
- [0 0 1]
- [1 1 0]
- [1 0 1]
- [0 1 1]]
-```
