@@ -137,6 +137,12 @@ py -m pytest -v
 
 ## Quick start
 
+The full public API (`ObservationSet`, `generateMatrix`, `iter_k_masks`,
+`cardinality`, `extract_k_window`) is importable directly from the
+top-level package, e.g. `from subsetmatrix import ObservationSet`.
+Examples below import from the submodules to show where each symbol
+actually lives, but either form works.
+
 ### Generate a subset matrix
 
 ```python
@@ -173,7 +179,7 @@ matrix = generateMatrix(3, [1, 2, 3])
 The easiest way to use the library is through `ObservationSet`.
 
 ```python
-from subsetmatrix.dataset_payload import ObservationSet
+from subsetmatrix import ObservationSet
 
 obs = ObservationSet(
     {
