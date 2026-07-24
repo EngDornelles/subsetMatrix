@@ -4,6 +4,10 @@
 __pycache__/
 subsetmatrix.egg-info/
 
+# Build artifacts (python -m build)
+dist/
+build/
+
 # Local agent governance (not shared repo content)
 .agents/
 AGENTS.md
