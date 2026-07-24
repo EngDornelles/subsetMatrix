@@ -43,6 +43,13 @@ def extract_k_window(
     Extract one or more k-sized subset groups from a generated subset matrix.
 
     If k is a list, groups are returned in ascending k order.
+
+    Offsets are computed from n and k alone, assuming `matrix` was built
+    with the canonical full k=1..n-1 sweep (e.g. engine.generateMatrix(n,
+    list(range(1, n)))). engine.generateMatrix's bare-call default no
+    longer produces that layout (it skips k=1 and includes k=n), so
+    passing a bare generateMatrix(n) result here silently extracts the
+    wrong rows instead of raising.
     """
     if matrix.ndim != 2:
         raise ValueError("matrix must be a 2D array filled with integers.")

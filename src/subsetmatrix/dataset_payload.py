@@ -1,6 +1,6 @@
 import numpy as np
 from math import comb
-from subsetmatrix.engineTest import generateMatrix
+from subsetmatrix.engine import generateMatrix
 from subsetmatrix.selecting_subsets import normalize_k_values
 from typing import Any
 from subsetmatrix.payload_args_validation import validate_args, validate_kwargs

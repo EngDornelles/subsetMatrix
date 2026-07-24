@@ -15,6 +15,23 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-07-24 — engineTest.py promoted to engine.py (old engine.py removed)
+
+- `engineTest.py` renamed to `engine.py`, replacing the original
+  engine module entirely; `dataset_payload.py` and
+  `benchmarks/bench_generate_matrix.py` import updated accordingly.
+- Removed the now-superseded `tests/test_engine.py` (tested the old
+  module's bare-call defaults, which no longer exist); the former
+  `tests/test_engineTest.py` renamed to `tests/test_engine.py`.
+- Fixed `tests/test_selecting_subsets.py`: its `extract_k_window`
+  fixtures relied on `generateMatrix(n)`'s old bare-call default
+  (full k=1..n-1 sweep); updated to pass that range explicitly, since
+  `extract_k_window`'s offset math assumes that specific layout and
+  doesn't verify it. Documented that assumption on
+  `extract_k_window`'s docstring.
+- Updated `README.md` examples that documented the old default output
+  shape/values.
+
 ## 2026-07-24 — Vectorized generateMatrix + bulk-nonzero get_subsets
 
 - `engineTest.generateMatrix` now expands masks to rows in one

@@ -147,15 +147,23 @@ matrix = generateMatrix(3)
 print(matrix)
 ```
 
+By default (no `K` given), rows are grouped by k, skipping singletons
+(k=1) and including the full set (k=n):
+
 Output:
 
 ```text
-[[1 0 0]
- [0 1 0]
- [0 0 1]
- [1 1 0]
+[[1 1 0]
  [1 0 1]
- [0 1 1]]
+ [0 1 1]
+ [1 1 1]]
+```
+
+To include singletons or restrict to specific subset sizes, pass `K`
+explicitly:
+
+```python
+matrix = generateMatrix(3, [1, 2, 3])
 ```
 
 ---
@@ -240,11 +248,18 @@ Output:
 
 You can extract only the rows for a specific subset size.
 
+`extract_k_window` computes row offsets assuming `matrix` was built
+with the full k=1..n-1 sweep, so pass that explicit `K` to
+`generateMatrix` — its own default (no `K`) skips k=1 and includes
+k=n, which no longer matches those offsets. If you just want specific
+k-sized subsets, prefer calling `generateMatrix(n, K)` directly (see
+above) instead of going through `extract_k_window`.
+
 ```python
 from subsetmatrix.engine import generateMatrix
 from subsetmatrix.selecting_subsets import extract_k_window
 
-matrix = generateMatrix(4)
+matrix = generateMatrix(4, list(range(1, 4)))
 
 k2_matrix = extract_k_window(matrix, 2)
 
@@ -351,9 +366,11 @@ has two active bits.
 
 ## Current API
 
-### `generateMatrix(n: int)`
+### `generateMatrix(n: int, K: list[int] = [])`
 
-Generates the full non-empty, non-full subset membership matrix.
+Generates the subset membership matrix for the requested subset sizes,
+grouped by k. If `K` is omitted, defaults to `range(2, n + 1)` —
+singletons (k=1) are skipped and the full set (k=n) is included.
 
 ```python
 from subsetmatrix.engine import generateMatrix
@@ -364,7 +381,14 @@ matrix = generateMatrix(4)
 For `n = 4`, the shape is:
 
 ```text
-(14, 4)
+(11, 4)
+```
+
+Pass `K` explicitly to select specific subset sizes:
+
+```python
+matrix = generateMatrix(4, [2])       # only pairs
+matrix = generateMatrix(4, [1, 2, 3]) # the pre-1.0 default: full k=1..n-1 sweep
 ```
 
 ---

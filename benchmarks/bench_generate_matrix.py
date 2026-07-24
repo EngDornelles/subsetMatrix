@@ -1,4 +1,4 @@
-"""Benchmark engineTest.generateMatrix / ObservationSet.get_subsets against
+"""Benchmark engine.generateMatrix / ObservationSet.get_subsets against
 a pure itertools.combinations equivalent.
 
 Run with:
@@ -9,7 +9,7 @@ from itertools import combinations
 
 import numpy as np
 
-from subsetmatrix.engineTest import generateMatrix
+from subsetmatrix.engine import generateMatrix
 from subsetmatrix.dataset_payload import ObservationSet
 
 REPEATS = 5
@@ -40,9 +40,9 @@ def time_it(fn, *args, repeats: int = REPEATS) -> float:
 
 def bench_generate_matrix():
     print("=" * 72)
-    print("generateMatrix (engineTest) vs itertools.combinations")
+    print("generateMatrix (engine) vs itertools.combinations")
     print("=" * 72)
-    header = f"{'n':>4} {'K':>14} {'rows':>8} {'engineTest (s)':>16} {'itertools (s)':>16} {'ratio':>8}"
+    header = f"{'n':>4} {'K':>14} {'rows':>8} {'engine (s)':>16} {'itertools (s)':>16} {'ratio':>8}"
     print(header)
     print("-" * len(header))
 
