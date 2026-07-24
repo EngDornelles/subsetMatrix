@@ -69,6 +69,6 @@ no use limiting its reach through that, so it might also be a list of anything.
             block = col_idx[pos:pos + count * k_val].reshape(count, k_val).tolist()
             pos += count * k_val
             for combo in block:
-                res.append([[self.X[j], self.Y[j]] for j in combo])
+                res.append([[self.X[j], self.Y[j]] for j in combo]) # type: ignore
         return res
 
