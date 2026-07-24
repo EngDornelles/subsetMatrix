@@ -15,6 +15,14 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-07-24 — v0.1.1: top-level imports
+
+- `src/subsetmatrix/__init__.py` now re-exports `ObservationSet`,
+  `generateMatrix`, `iter_k_masks`, `cardinality`, and
+  `extract_k_window`, so `from subsetmatrix import ObservationSet`
+  works without the submodule path. Bumped version to 0.1.1 to ship
+  it (0.1.0 is already on PyPI and immutable).
+
 ## 2026-07-24 — PyPI-shipping readiness pass
 
 - Verified the package builds cleanly (`python -m build`), passes
