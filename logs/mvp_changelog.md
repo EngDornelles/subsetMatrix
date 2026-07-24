@@ -15,6 +15,21 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-07-24 — PyPI-shipping readiness pass
+
+- Verified the package builds cleanly (`python -m build`), passes
+  `twine check` on both sdist and wheel, contains only the intended
+  4 modules (no test/benchmark leakage), and installs/imports
+  correctly from a fresh venv (not just editable install).
+- Confirmed `subsetmatrix` is unclaimed on PyPI.
+- Switched `license = { file = "LICENSE" }` + the MIT classifier to
+  PEP 639's `license = "MIT"` / `license-files = ["LICENSE"]`,
+  clearing a `SetuptoolsDeprecationWarning`. Bumped the
+  `build-system.requires` setuptools floor to `>=77` accordingly.
+- Added `dist/` and `build/` to `.gitignore`.
+- Not done (requires the user's own PyPI account/API token):
+  the actual `twine upload`.
+
 ## 2026-07-24 — engineTest.py promoted to engine.py (old engine.py removed)
 
 - `engineTest.py` renamed to `engine.py`, replacing the original
