@@ -1,6 +1,7 @@
 import numpy as np
-from subsetmatrix.engine import generateMatrix
-from subsetmatrix.selecting_subsets import extract_k_window, normalize_k_values
+from math import comb
+from subsetmatrix.engineTest import generateMatrix
+from subsetmatrix.selecting_subsets import normalize_k_values
 from typing import Any
 from subsetmatrix.payload_args_validation import validate_args, validate_kwargs
 
@@ -48,16 +49,26 @@ no use limiting its reach through that, so it might also be a list of anything.
             raise ValueError(f"The length of the X set and of the Y set are of different sizes: X: {len(self.X)} and Y: {len(self.Y)}")
     
     def get_subsets(self, k:int|list[int]) -> list[list[list[Any]]]:
-        k_values = normalize_k_values(k, self.n) # normalizing here to test if the set is the same as the set that contains all possible k
-        if k_values == list(range(1, self.n)):
-            temp_matrix = generateMatrix(self.n)
-        else:
-            temp_matrix = extract_k_window(generateMatrix(self.n),k_values)
+        k_values = normalize_k_values(k, self.n)
+        temp_matrix = generateMatrix(self.n, k_values)
+
+        # one bulk nonzero pass over the whole matrix instead of one
+        # np.flatnonzero call per row: rows are grouped by k in k_values
+        # order and every row within a k-group has exactly k ones, so the
+        # flat column-index stream can be reshaped per group without
+        # re-touching numpy per row.
+        _, col_idx = np.nonzero(temp_matrix)
 
         res = []
-        for i in temp_matrix:
-            indices = np.flatnonzero(i)
-            subset = [[self.X[j], self.Y[j]] for j in indices]
-            res.append(subset)
+        pos = 0
+        for k_val in k_values:
+            count = comb(self.n, k_val)
+            # .tolist() converts the whole block in one bulk C call; iterating
+            # a numpy array element-by-element boxes each entry into a numpy
+            # scalar, which is far costlier than plain-int indexing below.
+            block = col_idx[pos:pos + count * k_val].reshape(count, k_val).tolist()
+            pos += count * k_val
+            for combo in block:
+                res.append([[self.X[j], self.Y[j]] for j in combo])
         return res
 

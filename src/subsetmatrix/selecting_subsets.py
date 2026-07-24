@@ -19,8 +19,8 @@ def validate_k(k: int, n: int) -> int:
     except TypeError as exc:
         raise TypeError(f"k must be an integer. Received {k}.") from exc
 
-    if not 0 < k < n:
-        raise ValueError(f"k must satisfy 0 < k < n. Received k={k}, n={n}.")
+    if not 0 < k <= n:
+        raise ValueError(f"k must satisfy 0 < k <= n. Received k={k}, n={n}.")
 
     return k
 

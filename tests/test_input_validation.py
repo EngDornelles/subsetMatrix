@@ -180,9 +180,13 @@ def test_rejects_invalid_k_zero_after_valid_construction():
     obs = ObservationSet([10, 20, 30])
     with pytest.raises(ValueError): obs.get_subsets(0)
     
-def test_rejects_invalid_k_equal_to_n_after_valid_construction():
+def test_accepts_k_equal_to_n_and_returns_the_full_set():
     obs = ObservationSet([10, 20, 30])
-    with pytest.raises(ValueError): obs.get_subsets(3)
+    assert obs.get_subsets(3) == [[[1, 10], [2, 20], [3, 30]]]
+
+def test_rejects_k_greater_than_n_after_valid_construction():
+    obs = ObservationSet([10, 20, 30])
+    with pytest.raises(ValueError): obs.get_subsets(4)
 
 def test_rejects_bool_k_after_valid_construction():
     obs = ObservationSet([10, 20, 30])
