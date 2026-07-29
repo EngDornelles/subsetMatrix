@@ -8,6 +8,11 @@ subsetmatrix.egg-info/
 dist/
 build/
 
+# Functional-pipeline demo/scratch output
+*.db
+*.sqlite
+*.sqlite3
+
 # Local agent governance (not shared repo content)
 .agents/
 AGENTS.md
