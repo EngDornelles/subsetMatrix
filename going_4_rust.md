@@ -1,3 +1,18 @@
+## 2026-08-05 update — squeezer-only as of v0.2
+
+Per Lucas's positioning call, `lib.rs` has been trimmed to `combinations_values`
+only (plus its `gosper_next`/`comb` helpers) — the four other functions
+documented in §7 below (`combinations_indices`, `generate_matrix`,
+`combinations_indices_array`, `combinations_indices_hand_built`) and the two
+diagnostics have been removed from the crate. This document is kept in full,
+unedited below, as the historical record of why: it's the source for the
+claim that only the fused float path ever beat itertools end-to-end. See
+[`logs/mvp_changelog.md`](logs/mvp_changelog.md)'s 2026-08-05 entry for what
+changed mechanically. `combinations_values` itself was also hardened in that
+pass — see the same entry.
+
+---
+
 # Going 4 Rust — roadmap for a native extension on `functional`
 
 This document captures the reasoning and the concrete steps for adding a

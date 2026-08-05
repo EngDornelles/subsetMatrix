@@ -15,6 +15,60 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-08-05 — v0.2.0: Rust crate narrowed to the numeric squeezer
+
+- Lucas's positioning call: SubsetMatrix's native/Rust deliverable narrows
+  away from general-purpose subset ergonomics toward one thing done as
+  fast as possible — numeric `[X, Y]` subset arrays for downstream engine
+  work (Multinterp). Prior broader state (this session's starting point):
+  `rust/subsetmatrix_rs/src/lib.rs` had five real functions plus two
+  throwaway diagnostics — `combinations_indices`, `generate_matrix`,
+  `combinations_indices_array`, `combinations_values`,
+  `combinations_indices_hand_built`, `_count_combinations`,
+  `_generate_masks_only` — documented in full (including benchmark
+  numbers per function) in [`../going_4_rust.md`](../going_4_rust.md) §7.
+  Only `combinations_values` ever beat `itertools.combinations`
+  end-to-end; the rest converged back to itertools' cost or slightly
+  behind it once real Python objects had to come back out.
+- `lib.rs` trimmed to `gosper_next`, `comb`, and `combinations_values`
+  only. The four retired functions were never wired into
+  `native_backend.py`'s real path and were never part of the published
+  PyPI wheel (the crate isn't in the wheel's build step at all), so this
+  is not a public API change.
+- `combinations_values` hardened: previously allocated a zero-initialized
+  `Vec<f64>` buffer, wrote into it, then converted to a numpy array
+  (`Array3::from_shape_vec` + `into_pyarray`). Now allocates the output
+  numpy array directly via `PyArray3::new` (uninitialized) and writes
+  each `x[j]`/`y[j]` value straight into it via `uget_raw(..).write(..)`
+  as each mask's set bits are decoded — no intermediate Rust-side Vec, no
+  zero-init of cells that were always going to be overwritten, no
+  separate conversion pass. Every cell is written exactly once (each of
+  the `count` masks has exactly `k` set bits by construction), so no
+  uninitialized element is ever read or exposed to Python.
+- `native_backend.get_subsets_native` simplified: dropped the
+  `numbers_only` toggle and the generic index-based branch (which called
+  the now-removed `combinations_indices`). The function is numeric-only
+  now, matching the trimmed crate.
+- `benchmarks/bench_subsetmatrix_rs.py` rewritten against the trimmed
+  surface: the old `combinations_indices`-based correctness check and
+  "generation only" benchmark are gone (there's no separate generation
+  step to isolate anymore — generation and the value lookup are the same
+  Rust pass); correctness and benchmarking now go through
+  `get_subsets_native` directly. Also fixes a latent bug in the old
+  `bench_end_to_end`: it called `get_subsets_native(X, Y, k)` without
+  `numbers_only=True`, so it was silently exercising the generic
+  `combinations_indices` branch instead of the fused numeric path the
+  benchmark's own header claimed to measure.
+- `pyproject.toml` and `rust/subsetmatrix_rs/Cargo.toml` bumped to
+  0.2.0. This is a version/documentation marker for the positioning
+  change, not a PyPI publish — the native crate still isn't part of the
+  built wheel.
+- `README.md` rewritten: new "v0.2 direction" section up top states the
+  numeric-deliverable focus; new "Native backend (experimental)" section
+  documents `get_subsets_native`, its build-from-source requirement, and
+  points to `going_4_rust.md`/this changelog for the retired functions'
+  history instead of re-describing them.
+
 ## 2026-07-24 — v0.1.1: top-level imports
 
 - `src/subsetmatrix/__init__.py` now re-exports `ObservationSet`,

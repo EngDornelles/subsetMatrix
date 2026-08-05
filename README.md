@@ -2,6 +2,23 @@
 
 `subsetMatrix` is a small Python library for generating, selecting, and materializing subsets from an observation set.
 
+## v0.2 direction
+
+As of v0.2, the project's primary target is **fast numeric `[X, Y]` subset
+deliverables** — the shape needed by downstream engine work (Multinterp) —
+produced through a bare-bone Rust/PyO3 fused generator, not general-purpose
+subset ergonomics for arbitrary data types.
+
+The Python/NumPy engine documented below (`generateMatrix`, `ObservationSet`,
+etc.) remains the shipped PyPI public API and is unchanged — it still
+handles any `X` type (labels, strings, dates, whatever). The new native
+backend is numeric-only (`X`/`Y` must be floats) and is not yet part of the
+published wheel; see [Native backend](#native-backend-experimental) below
+for what it is, why it exists, and how to build it locally. See
+[`going_4_rust.md`](going_4_rust.md) and
+[`logs/mvp_changelog.md`](logs/mvp_changelog.md) for the full benchmark
+trail behind this decision and the v0.2 entry specifically.
+
 It starts with a simple idea:
 
 > Given `n` observations, generate a binary matrix where each row represents one subset.
@@ -455,6 +472,52 @@ obs.get_subsets(2)
 
 ---
 
+## Native backend (experimental)
+
+For numeric `X`/`Y`, `subsetmatrix` also ships a Rust/PyO3 extension
+(`rust/subsetmatrix_rs`) that fuses subset generation and the `X[j]`/`Y[j]`
+lookup into a single pass, writing straight into the output numpy array as
+each subset is decoded — no intermediate Python objects, no boolean/index
+matrix round-trip. This is the v0.2 focus described above.
+
+**This backend is not part of the published PyPI wheel.** It only works
+when built from source, inside this repo:
+
+```powershell
+py -m pip install maturin
+cd rust\subsetmatrix_rs
+..\..\.venv\Scripts\maturin.exe develop --release
+```
+
+Once built, `subsetmatrix_rs` is importable in the active venv, and
+`subsetmatrix.native_backend.get_subsets_native` wraps it:
+
+```python
+from subsetmatrix.native_backend import get_subsets_native
+
+X = [1.0, 2.0, 3.0, 4.0]
+Y = [10.0, 20.0, 30.0, 40.0]
+
+subsets = get_subsets_native(X, Y, k=2)
+```
+
+Unlike `ObservationSet.get_subsets`, this path requires `X` and `Y` to
+already be numeric (they're coerced to `float`) — it deliberately gives up
+type-agnosticism for speed. It returns one list per requested `k` value,
+each a nested `[[x, y], ...]`-per-subset list (or a raw numpy array with
+`python_typed=False`).
+
+An earlier iteration of this crate also had general-purpose, type-agnostic
+functions (a dense boolean membership matrix, plain index tuples). None of
+them beat `itertools.combinations` end-to-end once real values had to come
+back out as Python objects — only the fused float path did, decisively. As
+of v0.2 the crate is trimmed down to that one function; the retired
+functions and their benchmark numbers are preserved in
+[`going_4_rust.md`](going_4_rust.md) and
+[`logs/mvp_changelog.md`](logs/mvp_changelog.md), not deleted from history.
+
+---
+
 ## Repository structure
 
 ```text
@@ -462,12 +525,20 @@ subsetMatrix/
 ├── LICENSE
 ├── README.md
 ├── pyproject.toml
+├── going_4_rust.md
 ├── src/
 │   └── subsetmatrix/
 │       ├── __init__.py
 │       ├── engine.py
 │       ├── selecting_subsets.py
-│       └── dataset_payload.py
+│       ├── dataset_payload.py
+│       └── native_backend.py      # wraps the Rust extension, not in __init__'s public exports
+├── rust/
+│   └── subsetmatrix_rs/           # PyO3 extension; build from source, not on PyPI (see above)
+│       └── src/lib.rs
+├── benchmarks/
+│   ├── bench_generate_matrix.py
+│   └── bench_subsetmatrix_rs.py
 └── tests/
     ├── test_engine.py
     ├── test_selecting_subsets.py
@@ -583,7 +654,8 @@ Example current test result:
 
 ## Development status
 
-`subsetMatrix` is in early development.
+`subsetMatrix` is in early development. The Python/NumPy engine is
+published and stable; the native backend is the active area of work.
 
 Current stable layers:
 
@@ -596,6 +668,9 @@ selecting_subsets.py
 
 dataset_payload.py
 → materialize dataset subsets
+
+native_backend.py + rust/subsetmatrix_rs/
+→ fast numeric [X, Y] subset deliverables (build-from-source, see above)
 ```
 
 Planned improvements may include:
@@ -607,7 +682,7 @@ Planned improvements may include:
 * optional pandas helpers;
 * optional export utilities;
 * expanded documentation;
-* performance benchmarks.
+* shipping the native backend as part of the published wheel.
 
 ---
 
