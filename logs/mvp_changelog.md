@@ -15,6 +15,23 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-08-05 — v0.2.0 published
+
+- `master` fast-forwarded to `functional`'s tip (`be67b57`) -- was 7
+  commits behind, no unique commits of its own, so a clean fast-forward.
+  `v0.2.0` tagged and released off `master`, restoring the convention
+  from `v0.1.0`/`v0.1.1` (both released off `master`) rather than tagging
+  off `functional` directly.
+- First real run of the rewritten `publish.yml`: all six jobs (Linux
+  x86_64/aarch64, Windows, macOS x86_64/aarch64, sdist) succeeded, ~1-1.5
+  min each, then published via the existing trusted-publisher `pypi`
+  environment -- no new PyPI-side setup was needed, confirming the
+  bundle-not-dependency correction was the right call.
+- Verified against the real index (not a local build): fresh venv,
+  `pip install subsetmatrix==0.2.0`, confirmed `get_subsets_native` and
+  the rest of the public API work from an actual PyPI install.
+- `v0.1.*` is now superseded.
+
 ## 2026-08-05 — Correction: bundle subsetmatrix_rs into subsetmatrix's own wheel, not a separate PyPI package
 
 - Follow-up/correction to the entry below. Lucas's actual intent:
