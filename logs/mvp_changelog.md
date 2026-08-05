@@ -15,6 +15,70 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-08-05 — combinations_values: boolean-bulk-as-transformer attempt tested, reverted
+
+- Second follow-up to the v0.2.0 entry below (see the entry above this
+  one for the first). Lucas clarified the original "crank it up a knot"
+  idea wasn't about skipping initialization at all (that was my
+  misreading, corrected in the entry above) -- it was about not
+  materializing a full **boolean membership matrix** (like the old,
+  removed `generate_matrix`: one row per subset, one column per
+  observation, 1/0 per cell) and only afterward "validating"/transforming
+  it into X/Y pairs as a separate reallocating pass. The proposed fix:
+  still zero-init-and-bulk-generate the boolean membership data per
+  k-group (as before), but instead of that boolean matrix being the
+  final artifact requiring a later separate transform-and-reallocate
+  step, use it directly as a read-only "transformer" to gather X[j]/Y[j]
+  into an already-preallocated (count, k, 2) output, both buffers sized
+  once upfront, no reallocation in between. Estimated as a minor win,
+  "about 1%, maybe 2%."
+- Implemented literally as `combinations_values_boolbulk` (added
+  alongside `combinations_values`, not replacing it, so both could be
+  benchmarked in the same build): a (count, n) zero-init'd `Vec<u8>`
+  boolean bulk filled via the same Gosper-hack mask-decode loop, then a
+  second pass scanning each row's `n` boolean columns to gather
+  `x[j]`/`y[j]` into a separately pre-allocated (count, k, 2) `Vec<f64>`.
+- Benchmarked head-to-head against `combinations_values`, plus each
+  against `itertools`, across a wide k range (n=20, k=2/5/8/10/14/15/16/19,
+  25 reps, min-of-N) to see how the boolean-scan-vs-bit-decode tradeoff
+  moves with the k/n ratio. Correctness matched exactly at every k
+  tested (not a bug) -- the ratios did not:
+
+  ```
+     k    subsets    itertools  current (s)  cur ratio  boolbulk (s)  bb ratio   bb/cur
+     2        190     0.000029     0.000002     16.94x      0.000004     8.00x    2.12x
+     5      15504     0.005731     0.000271     21.18x      0.000963     5.95x    3.56x
+     8     125970     0.087139     0.003123     27.90x      0.010006     8.71x    3.20x
+    10     184756     0.172695     0.005673     30.44x      0.015799    10.93x    2.79x
+    14      38760     0.044245     0.001644     26.91x      0.003517    12.58x    2.14x
+    15      15504     0.016218     0.000709     22.86x      0.001414    11.47x    1.99x
+    16       4845     0.004461     0.000240     18.58x      0.000458     9.75x    1.91x
+    19         20     0.000020     0.000001     18.09x      0.000002    12.44x    1.45x
+  ```
+
+  The boolean-bulk variant was **1.45x-3.56x slower** than the current
+  implementation at every k tested, worst around k=5..10 (where `count`
+  is largest and the n/k ratio is still substantial), best (but still
+  clearly worse) at k near n, where scanning n columns approaches
+  scanning k. Not a 1-2% win in either direction -- a real, order-of-
+  magnitude-relevant regression.
+- Diagnosis: decoding straight from the mask register only ever touches
+  the `k` set bits (Gosper's hack skips the zero bits entirely by
+  construction). Materializing a boolean row and scanning it touches all
+  `n` columns per row, most of which are zero for typical `k << n`
+  cases -- strictly more work, not less. The extra `(count, n)` buffer
+  is also frequently larger than the `(count, k, 2)` output it feeds
+  (e.g. at k=2, n=20: 20 boolean bytes generated to find 2 values).
+- Action: removed `combinations_values_boolbulk` from `lib.rs` --
+  correctness was fine, but shipping a slower, unused alternate
+  implementation contradicts the "squeezer-only, no dead weight" premise
+  the crate was just trimmed down to. `combinations_values` itself is
+  unchanged from the previous entry. Both attempts (this one and the
+  `uget_raw` one) are recorded in `lib.rs`'s module-level doc comment so
+  neither gets retried without new evidence.
+- Verified: `pytest` (82 passed) against the final build (no
+  `combinations_values_boolbulk` present).
+
 ## 2026-08-05 — combinations_values: uninitialized-array write attempt reverted
 
 - Follow-up to the v0.2.0 entry below. The hardening described there

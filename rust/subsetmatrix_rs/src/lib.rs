@@ -14,15 +14,31 @@ use pyo3::prelude::*;
 /// were never part of the published PyPI wheel (this crate isn't built
 /// into the `subsetmatrix` distribution).
 ///
-/// A follow-up attempt to write directly into an uninitialized numpy array
-/// via `PyArray3::new` + per-element `uget_raw(..).write(..)` (skipping the
-/// zero-init'd `Vec<f64>` buffer below) was benchmarked head-to-head against
-/// this version and measured consistently *slower* (~19-20x itertools vs.
-/// this version's ~20-29x, n=20, k=14/15/16, 25 reps, both builds benchmarked
-/// back-to-back) -- the per-element stride computation `uget_raw` does for
-/// each 3D index apparently costs more than the zero-init + bulk move this
-/// version pays instead. Reverted; see `logs/mvp_changelog.md`'s 2026-08-05
-/// entries for both the attempt and the revert.
+/// Two follow-up attempts to speed this up further, both benchmarked and
+/// both reverted -- see `logs/mvp_changelog.md`'s 2026-08-05 entries for
+/// full numbers:
+///
+/// 1. Write directly into an uninitialized numpy array via `PyArray3::new`
+///    + per-element `uget_raw(..).write(..)`, skipping the zero-init'd
+///    `Vec<f64>` buffer below. Measured consistently *slower*
+///    (~19-20x itertools vs. this version's ~20-29x, n=20, k=14/15/16) --
+///    the per-element stride computation `uget_raw` does for each 3D index
+///    costs more than the zero-init + bulk move it was meant to save.
+/// 2. Generate a (count, n) zero-init'd boolean membership bulk per
+///    k-group first (mask-decode via Gosper's hack, same as below, but
+///    writing a 1/0 per column instead of x[j]/y[j] directly), then scan
+///    each row's n boolean columns in a second pass to gather x[j]/y[j]
+///    into the (count, k, 2) output. Measured *substantially* slower --
+///    1.45x-3.56x slower than this version across k=2..19, worst around
+///    k=5..10. Scanning all n boolean columns per row costs more than
+///    decoding straight from the k set bits in the mask register, and the
+///    extra (count, n) buffer is often bigger than the (count, k, 2)
+///    output it feeds.
+///
+/// Both attempts shared the same premise -- fewer/different intermediate
+/// allocations should be faster -- and both lost to this version's
+/// "decode straight from the mask register, one pass, one buffer"
+/// approach in practice.
 #[pymodule]
 mod subsetmatrix_rs {
     use numpy::ndarray::Array3;
