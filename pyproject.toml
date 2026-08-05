@@ -36,7 +36,8 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-    "numpy>=1.26"
+    "numpy>=1.26",
+    "subsetmatrix_rs>=0.2.0,<0.3"
 ]
 
 [project.optional-dependencies]

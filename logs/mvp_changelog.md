@@ -15,6 +15,80 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-08-05 — v0.2.0 release prep: ship the native backend for real, lean README, dead-file cleanup
+
+- Lucas's direction: `pip install subsetmatrix` should give the full
+  package -- fast numeric path included -- not "a chewed up version
+  using only numpy." Decided against building `subsetmatrix_rs` into
+  `subsetmatrix`'s own wheel (would mean switching the whole package's
+  build backend to maturin and a mixed Rust/Python layout); instead
+  published `subsetmatrix_rs` as its **own small PyPI package**, and
+  `subsetmatrix` now declares it as a real dependency
+  (`subsetmatrix_rs>=0.2.0,<0.3`). `rust/subsetmatrix_rs/pyproject.toml`
+  already existed as a proper maturin project (from the original
+  `going_4_rust.md` scaffolding) -- filled in its metadata (description,
+  license, readme, classifiers; dropped the inherited PyPy classifier
+  since abi3 wheels are CPython-specific) rather than restructuring
+  anything.
+- `Cargo.toml`: added `pyo3`'s `abi3-py310` feature. One compiled wheel
+  per (OS, arch) now covers every Python `subsetmatrix` supports
+  (`>=3.10`), instead of a wheel per Python-version-per-platform. Kept
+  `u128` masks (not `u64`) despite the earlier open item in
+  `going_4_rust.md` -- Lucas: the direction is toward *larger* `n` for
+  quenching huge datasets, not smaller, so trading mask width for a
+  hardware-division win now would cut against where this is headed.
+- New `.github/workflows/publish-rust.yml`: builds `subsetmatrix_rs`
+  wheels via `maturin-action` across Linux (x86_64/aarch64), Windows
+  (x64), and macOS (x86_64/aarch64), plus an sdist, then publishes via
+  PyPI trusted publishing on GitHub Release. Mirrors the existing
+  `publish.yml` pattern (same `release: published` trigger, same OIDC
+  approach). **Not verified on real CI** -- written from the standard
+  maturin-action pattern, sanity-checked for syntax, but this repo has
+  no CI runner access from this session. First real run should happen
+  under supervision.
+- `__init__.py`: added `get_subsets_native` to the public exports
+  (additive -- nothing existing removed or renamed, so this doesn't
+  break the current PyPI public API contract).
+- **Verified end-to-end, not just configured**: built an actual
+  `subsetmatrix_rs` wheel locally (`maturin build --release`), created a
+  brand-new venv from scratch, and ran
+  `pip install --find-links rust/subsetmatrix_rs/dist .` against the
+  repo root -- exactly what `pip install subsetmatrix` will do once both
+  packages are on PyPI. Both packages installed, `import subsetmatrix`
+  worked, and both `generateMatrix` and `get_subsets_native` ran
+  correctly from the fresh environment. `pytest` also re-run clean (71
+  passed) throughout.
+- Dead-file cleanup (delegated, verified): removed
+  `src/subsetmatrix/functional.py` (zero references anywhere -- an
+  abandoned duplicate of `engine.iter_k_masks`) and the
+  `functional_pipeline.py` / `bench_functional_pipeline.py` /
+  `test_functional_pipeline.py` trio (a self-contained SQLite-persistence
+  prototype, explicitly documented as "kept deliberately separate," never
+  exported, never wired to anything real). Confirmed via grep that no
+  code still imports either; historical prose mentions in
+  `going_4_rust.md` left untouched.
+- `README.md` rewritten from scratch: 723 lines -> 88. Cut the padded
+  "why this exists" bullet list, the redundant "design notes" prose, the
+  repository-structure tree, and duplicate examples -- all the stuff an
+  outside reader (or an AI skimming the package) would reasonably read as
+  bloat. Kept: what it is, install, one example per path (native +
+  general), a compact API table, and the three notes that actually matter
+  (ordering, memory, the `extract_k_window` layout footgun). Caught and
+  fixed two of my own inaccuracies while proof-testing the examples
+  against a real install before finalizing: `get_subsets_native`'s return
+  shape has an extra per-k nesting level I'd glossed over in the first
+  draft, and the "15-30x faster" performance claim only holds for
+  `python_typed=False` (raw array) -- the default (`python_typed=True`)
+  lands close to itertools' own speed, per the python_typed finding
+  already on record from the original `going_4_rust.md` benchmarking.
+  Both fixed before landing, not left in.
+- **Not done this session, requires Lucas directly**: registering
+  `subsetmatrix_rs` as a project on PyPI and configuring trusted
+  publishing for it (PyPI-side, tied to his account -- cannot be done via
+  CLI/API from here) and running the actual GitHub Release that triggers
+  both publish workflows. Nothing was pushed, tagged, or published this
+  session.
+
 ## 2026-08-05 — combinations_values: boolean-bulk-as-transformer attempt tested, reverted
 
 - Second follow-up to the v0.2.0 entry below (see the entry above this
