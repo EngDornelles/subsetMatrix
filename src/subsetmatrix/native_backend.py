@@ -19,7 +19,7 @@ raw array.
 """
 
 from subsetmatrix.selecting_subsets import normalize_k_values
-import subsetmatrix_rs
+from . import subsetmatrix_rs
 
 
 def get_subsets_native(

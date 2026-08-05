@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=77", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["maturin>=1.14,<2.0"]
+build-backend = "maturin"
 
 [project]
 name = "subsetmatrix"
@@ -36,8 +36,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-    "numpy>=1.26",
-    "subsetmatrix_rs>=0.2.0,<0.3"
+    "numpy>=1.26"
 ]
 
 [project.optional-dependencies]
@@ -50,8 +49,11 @@ Homepage = "https://github.com/EngDornelles/subsetMatrix"
 Repository = "https://github.com/EngDornelles/subsetMatrix"
 Issues = "https://github.com/EngDornelles/subsetMatrix/issues"
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.maturin]
+python-source = "src"
+manifest-path = "rust/subsetmatrix_rs/Cargo.toml"
+module-name = "subsetmatrix.subsetmatrix_rs"
+features = ["pyo3/extension-module"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

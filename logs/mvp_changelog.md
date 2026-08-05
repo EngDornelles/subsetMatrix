@@ -15,6 +15,67 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-08-05 — Correction: bundle subsetmatrix_rs into subsetmatrix's own wheel, not a separate PyPI package
+
+- Follow-up/correction to the entry below. Lucas's actual intent:
+  `subsetmatrix_rs` was never meant to be an independent package with its
+  own PyPI identity and a version-pinned dependency relationship -- it's
+  "just some subfolder inside the project," meant to be adjoined into
+  `subsetmatrix`'s own wheel, one project, one install.
+- Reworked: root `pyproject.toml`'s `build-system` switched from
+  `setuptools.build_meta` to `maturin`, with a `[tool.maturin]` mixed
+  Python/Rust config (`python-source = "src"`,
+  `manifest-path = "rust/subsetmatrix_rs/Cargo.toml"`,
+  `module-name = "subsetmatrix.subsetmatrix_rs"`). The compiled extension
+  now lands *inside* the `subsetmatrix` package directory
+  (`subsetmatrix/subsetmatrix_rs.pyd` alongside `__init__.py`,
+  `engine.py`, etc.) as part of the same wheel -- confirmed by inspecting
+  the built wheel's file list. Removed the `subsetmatrix_rs>=0.2.0,<0.3`
+  dependency line entirely; there's nothing external to depend on anymore.
+  `native_backend.py`'s import changed from `import subsetmatrix_rs` to
+  a relative `from . import subsetmatrix_rs` (avoids any ambiguity with
+  `subsetmatrix/__init__.py`'s own partial-init state during import).
+- This is a strictly better outcome than the separate-package approach
+  for the PyPI-side blocker flagged earlier: no new project registration
+  or trusted-publisher setup needed, since it's still just the one
+  existing `subsetmatrix` project on PyPI, same trusted-publisher
+  environment (`pypi`) as before.
+- Deleted the vestigial standalone-package files created for the
+  (wrong) separate-package approach: `rust/subsetmatrix_rs/pyproject.toml`,
+  `LICENSE`, `README.md`, and `.github/workflows/publish-rust.yml`.
+  `rust/subsetmatrix_rs/Cargo.toml`/`Cargo.lock`/`src/lib.rs` stay --
+  still needed, now referenced via `manifest-path` from the root.
+- Rewrote `.github/workflows/publish.yml` itself: the old version ran
+  plain `python -m build` on a single Ubuntu runner, which would have
+  produced a single Linux-only wheel now that the package contains
+  compiled code (previously fine, since the old wheel was pure Python
+  and "universal"). Replaced with a `maturin-action` matrix (Linux
+  x86_64/aarch64, Windows x64, macOS x86_64/aarch64) plus an sdist job,
+  merged and published together -- same job shape as the (now-deleted)
+  `publish-rust.yml` drafted for the wrong architecture, retargeted at
+  the root project. Same environment name and PyPI project as before, so
+  the existing trusted-publisher config should keep working unchanged --
+  still **unverified on real CI**, no runner access from this session.
+- Also caught and fixed: `maturin develop` drops the compiled
+  `subsetmatrix_rs.pyd`/`.pdb` directly into `src/subsetmatrix/` for the
+  editable install to work. Added `src/subsetmatrix/*.pyd`,
+  `*.pdb`, `*.so` to `.gitignore` before committing -- these are
+  per-machine build output, not source, and were about to get
+  accidentally staged.
+- **Verified end-to-end, the real way this time**: built the actual
+  wheel (`maturin build --release`), inspected its contents directly
+  (confirmed `subsetmatrix/subsetmatrix_rs.pyd` is inside the
+  `subsetmatrix/` directory in the wheel, not a separate package), then
+  installed *that exact wheel file* (not editable, not `--find-links`)
+  into a brand-new venv and ran the full public API from it --
+  `get_subsets_native`, `ObservationSet`, `generateMatrix`,
+  `iter_k_masks`, `cardinality`, `extract_k_window` all confirmed
+  working. `pytest` clean (71 passed) in the main dev venv throughout.
+- Net state: ready to push and publish. No new PyPI-side setup required
+  -- the existing `subsetmatrix` trusted publisher should just work, but
+  the multi-platform CI has not run for real yet, so the first release
+  after this change is worth watching rather than trusting blind.
+
 ## 2026-08-05 — v0.2.0 release prep: ship the native backend for real, lean README, dead-file cleanup
 
 - Lucas's direction: `pip install subsetmatrix` should give the full

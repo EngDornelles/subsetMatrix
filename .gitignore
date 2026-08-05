@@ -4,9 +4,14 @@
 __pycache__/
 subsetmatrix.egg-info/
 
-# Build artifacts (python -m build)
+# Build artifacts (python -m build / maturin)
 dist/
 build/
+
+# Compiled extension dropped into src/ by `maturin develop`
+src/subsetmatrix/*.pyd
+src/subsetmatrix/*.pdb
+src/subsetmatrix/*.so
 
 # Functional-pipeline demo/scratch output
 *.db
