@@ -15,6 +15,54 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-08-05 — combinations_values: uninitialized-array write attempt reverted
+
+- Follow-up to the v0.2.0 entry below. The hardening described there
+  (allocate the output numpy array uninitialized via `PyArray3::new`,
+  write each value directly via `uget_raw(..).write(..)`, skip the
+  zero-init'd `Vec<f64>` buffer entirely) was committed, then tested
+  head-to-head against the original zero-init-Vec-then-move
+  implementation on Lucas's request, after he flagged the measured ~16x
+  itertools ratio as suspiciously low against `going_4_rust.md`'s
+  original ~20-37x claim.
+- Method: committed the hardened version first (so it wasn't lost),
+  temporarily restored the pre-hardening `lib.rs` from commit `17d490a`,
+  rebuilt with `maturin develop --release`, benchmarked
+  `combinations_values` directly against `itertools` (n=20, k=14/15/16,
+  25 reps, min-of-N) with a plain non-numpy itertools baseline (matching
+  ObservationSet — this is a `subsetmatrix_rs` internal function, not
+  the `ObservationSet` OOP path). Then restored the hardened version and
+  ran the identical benchmark back-to-back, same process, same machine
+  state, to rule out load/variance as the explanation.
+- Result: the **old (zero-init Vec) version was consistently faster**.
+  Two back-to-back A/B runs:
+  - Old: 29.48x / 27.58x / 19.30x (k=14/15/16)
+  - New (hardened): 18.75x / 19.71x / 13.98x (k=14/15/16)
+  Confirmed by a third pair of runs through the full
+  `bench_subsetmatrix_rs.py` script (25 reps): old version's raw-array
+  path lands at 23.42x / 21.45x / 16.00x.
+- Diagnosis (not fully isolated, but consistent with the numbers):
+  `uget_raw([row, col, 0/1])` computes a stride-based offset via
+  `NpyIndex::get_unchecked` on every single element write — two calls
+  per decoded member, each recomputing a 3D-index-to-offset
+  transformation through the numpy array's stride metadata. The old
+  version does the equivalent offset math (`base + col*2`) directly on a
+  plain contiguous `Vec<f64>` with no indirection through the array
+  abstraction. The per-element stride computation apparently costs more
+  than the zero-init + bulk `into_pyarray` move it was meant to save —
+  the theory that "avoid storing an intermediate buffer, write directly"
+  would be strictly faster didn't hold in practice for this API.
+- Action: `combinations_values` reverted to the zero-init-Vec
+  implementation. `lib.rs` keeps the trimmed squeezer-only surface from
+  the v0.2.0 entry below (that part of the decision is independent of
+  this and still holds); only the internal write strategy inside
+  `combinations_values` changed back. Doc comments in `lib.rs` updated
+  to record the attempt and the measured result, so it isn't retried
+  blind. `README.md` softened one sentence that implied a
+  write-straight-into-the-final-array claim.
+- Verified: `pytest` (82 passed) and `bench_subsetmatrix_rs.py`
+  correctness check both pass against the reverted build.
+
 ## 2026-08-05 — v0.2.0: Rust crate narrowed to the numeric squeezer
 
 - Lucas's positioning call: SubsetMatrix's native/Rust deliverable narrows

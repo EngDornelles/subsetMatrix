@@ -9,14 +9,24 @@ use pyo3::prelude::*;
 /// `combinations_indices_hand_built`) converged back to itertools' own cost
 /// or slightly behind it, because handing back individually-addressable
 /// Python objects is the actual bottleneck, not generation. v0.2 narrows the
-/// crate to the one function that won and pushes it further, instead of
-/// carrying four dead-weight variants that were never wired into
-/// `native_backend.py`'s real path and were never part of the published
-/// PyPI wheel (this crate isn't built into the `subsetmatrix` distribution).
+/// crate to the one function that won, instead of carrying four dead-weight
+/// variants that were never wired into `native_backend.py`'s real path and
+/// were never part of the published PyPI wheel (this crate isn't built
+/// into the `subsetmatrix` distribution).
+///
+/// A follow-up attempt to write directly into an uninitialized numpy array
+/// via `PyArray3::new` + per-element `uget_raw(..).write(..)` (skipping the
+/// zero-init'd `Vec<f64>` buffer below) was benchmarked head-to-head against
+/// this version and measured consistently *slower* (~19-20x itertools vs.
+/// this version's ~20-29x, n=20, k=14/15/16, 25 reps, both builds benchmarked
+/// back-to-back) -- the per-element stride computation `uget_raw` does for
+/// each 3D index apparently costs more than the zero-init + bulk move this
+/// version pays instead. Reverted; see `logs/mvp_changelog.md`'s 2026-08-05
+/// entries for both the attempt and the revert.
 #[pymodule]
 mod subsetmatrix_rs {
-    use numpy::prelude::*;
-    use numpy::PyArray3;
+    use numpy::ndarray::Array3;
+    use numpy::{IntoPyArray, PyArray3};
     use pyo3::exceptions::PyValueError;
     use pyo3::prelude::*;
 
@@ -39,16 +49,18 @@ mod subsetmatrix_rs {
     }
 
     /// Floats-only fused path: generation AND the [X[j], Y[j]] lookup happen
-    /// in the same Rust pass, writing straight into a (count, k, 2) f64
-    /// numpy array as each mask's set bits are decoded -- no intermediate
-    /// index structure, no intermediate Rust-side Vec, no second Python-side
-    /// assembly loop, and no wasted zero-initialization: the array is
-    /// allocated uninitialized and every one of its cells is written
-    /// exactly once by this loop before Python ever sees it. This is the
-    /// only path that beat itertools end-to-end in benchmarking (see
-    /// `going_4_rust.md` #7.3) -- numeric X/Y only, the Multinterp use case,
-    /// in exchange for never materializing a single per-subset Python
-    /// object.
+    /// in the same Rust pass, straight into one pre-allocated (count, k, 2)
+    /// f64 buffer -- no intermediate index structure, no second Python-side
+    /// assembly loop. This is the only path that beat itertools end-to-end
+    /// in benchmarking (see `going_4_rust.md` #7.3) -- numeric X/Y only, the
+    /// Multinterp use case, in exchange for never materializing a single
+    /// per-subset Python object.
+    ///
+    /// The `Vec<f64>` buffer is zero-initialized before being filled, then
+    /// moved (not copied) into the returned numpy array via
+    /// `into_pyarray`. An uninitialized-array + per-element `uget_raw`
+    /// write variant was tried and benchmarked slower than this -- see the
+    /// module-level doc comment above.
     #[pyfunction]
     fn combinations_values<'py>(
         py: Python<'py>,
@@ -70,31 +82,20 @@ mod subsetmatrix_rs {
         }
 
         let count = comb(n, k);
-
-        // SAFETY: `PyArray3::new` returns uninitialized memory (see its
-        // docs: forming a `&`/`&mut` over an element before it's written is
-        // UB, so this writes through `uget_raw(..).write(..)` only, never
-        // through a slice/array view). Every one of the count*k*2 cells is
-        // written exactly once below: the Gosper walk visits exactly
-        // `count` masks, each with exactly `k` set bits by construction
-        // (starting mask is `(1<<k)-1`), so the (row, col, 0|1) writes
-        // cover the whole array with no gaps and no double-writes before
-        // `arr` is returned to Python.
-        let arr = unsafe { PyArray3::<f64>::new(py, (count, k, 2), false) };
+        let mut flat = vec![0f64; count * k * 2];
 
         let limit: u128 = 1u128 << n;
         let mut mask: u128 = (1u128 << k) - 1;
         let mut row = 0usize;
         while mask < limit {
+            let base = row * k * 2;
             let mut m = mask;
             let mut col = 0usize;
             while m != 0 {
                 let low = m & m.wrapping_neg();
                 let j = low.trailing_zeros() as usize;
-                unsafe {
-                    arr.uget_raw([row, col, 0]).write(x[j]);
-                    arr.uget_raw([row, col, 1]).write(y[j]);
-                }
+                flat[base + col * 2] = x[j];
+                flat[base + col * 2 + 1] = y[j];
                 col += 1;
                 m ^= low;
             }
@@ -102,6 +103,8 @@ mod subsetmatrix_rs {
             row += 1;
         }
 
-        Ok(arr)
+        let arr = Array3::from_shape_vec((count, k, 2), flat)
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
+        Ok(arr.into_pyarray(py))
     }
 }

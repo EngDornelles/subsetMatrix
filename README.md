@@ -476,9 +476,9 @@ obs.get_subsets(2)
 
 For numeric `X`/`Y`, `subsetmatrix` also ships a Rust/PyO3 extension
 (`rust/subsetmatrix_rs`) that fuses subset generation and the `X[j]`/`Y[j]`
-lookup into a single pass, writing straight into the output numpy array as
-each subset is decoded — no intermediate Python objects, no boolean/index
-matrix round-trip. This is the v0.2 focus described above.
+lookup into a single pass over one pre-allocated buffer as each subset is
+decoded — no intermediate Python objects, no boolean/index matrix
+round-trip. This is the v0.2 focus described above.
 
 **This backend is not part of the published PyPI wheel.** It only works
 when built from source, inside this repo:
