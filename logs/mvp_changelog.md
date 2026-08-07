@@ -15,6 +15,23 @@ Format: newest entries at the top.
 
 ---
 
+## 2026-08-07 — generateMatrix's n cap becomes a kwarg (v0.2.1)
+
+- `generateMatrix(n, K=[], n_max=20)`: the hard `n > 20` rejection is now
+  a configurable ceiling. Default stays 20 — the friendly starting point —
+  so nothing that worked before changes.
+- The cap was never about the algorithm: `iter_k_masks` has no ceiling and
+  never did. It guarded the dense `(rows, n)` expansion, which is the only
+  expensive part. A narrow `K` is cheap well past 20 (`n=30, K=[3]` is
+  4,060 rows); the default `K` at `n=30` is over a billion. Callers who
+  raise `n_max` own that risk, and the README says so plainly rather than
+  the library second-guessing them.
+- Documented the one ceiling that is not negotiable: rows are `uint32`, so
+  `n <= 32` holds whatever `n_max` says (`n=33` overflows).
+- Three tests: default still rejects `n=21`, `n_max=30` lifts it, and the
+  lifted output cross-checks against `itertools.combinations` at
+  `n=21, k=3`.
+
 ## 2026-08-05 — v0.2.0 published
 
 - `master` fast-forwarded to `functional`'s tip (`be67b57`) -- was 7

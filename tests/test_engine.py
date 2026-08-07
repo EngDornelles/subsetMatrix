@@ -92,3 +92,18 @@ def test_generate_matrix_matches_itertools_combinations(n):
 def test_generate_matrix_rejects_small_n():
     with pytest.raises(ValueError):
         generateMatrix(2)
+
+def test_generate_matrix_default_n_max_is_still_twenty():
+    with pytest.raises(ValueError):
+        generateMatrix(21, [3])
+
+def test_generate_matrix_n_max_lifts_the_cap():
+    matrix = generateMatrix(21, [3], n_max=30)
+    assert matrix.shape == (1330, 21)  # comb(21, 3)
+    assert set(matrix.sum(axis=1).tolist()) == {3}
+
+def test_generate_matrix_past_default_cap_matches_itertools():
+    matrix = generateMatrix(21, [3], n_max=30)
+    got = {frozenset(np.flatnonzero(row).tolist()) for row in matrix}
+    assert got == {frozenset(c) for c in combinations(range(21), 3)}
+    assert len(got) == matrix.shape[0]

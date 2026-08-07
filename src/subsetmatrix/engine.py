@@ -23,14 +23,24 @@ def cardinality(mask: int) -> int:
     """Useful if you're getting a mask outside of context and needs to know where it belongs."""
     return mask.bit_count()
 
-def generateMatrix(n:int, K:list=[]) -> npt.NDArray[np.uint32]:
-    """The matrix won't follow the cardinal order of growth, but the k-sized groups."""
+def generateMatrix(n:int, K:list=[], n_max:int=20) -> npt.NDArray[np.uint32]:
+    """The matrix won't follow the cardinal order of growth, but the k-sized groups.
+
+n_max is the ceiling on n, not a property of the algorithm: the dense
+(rows, n) array is what gets expensive, and rows grows like 2**n on the
+default K. 20 is the friendly default; raise it when you know what you
+are asking for -- a narrow K stays cheap at much larger n, the default K
+does not, and running out of memory is the caller's to manage. Rows are
+uint32, so n <= 32 is a hard representation ceiling whatever n_max says."""
     if not K:
         K = list(range(2, n + 1)) # skip singletons (k=1); include the full set (k=n)
     if n < 3:
         raise ValueError("The number of observations should be > 2.")
-    if n > 20:
-        raise ValueError("Dense uint32 generation is temporarily capped at n <=20")
+    if n > n_max:
+        raise ValueError(
+            f"Dense uint32 generation is capped at n <= {n_max}; "
+            "pass a larger n_max to lift it."
+        )
 
     total_rows = sum(comb(n, k) for k in K) # sized to whatever K actually requests, not the full 2**n - 2 span
     matr = np.empty((total_rows, n), dtype=np.uint32)

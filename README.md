@@ -63,7 +63,7 @@ If `X` is omitted, `ObservationSet` generates integer labels for you
 |---|---|
 | `get_subsets_native(X, Y, k, python_typed=True)` | Fast, numeric-only. Returns a list with one entry per `k` value; each entry is `[[x, y], ...]` per subset. |
 | `ObservationSet({"X": ..., "Y": ...}).get_subsets(k)` | General-purpose, any `X` type. Returns one flat list of `[[x, y], ...]` per subset across all `k` values -- not grouped per `k` like the native path. |
-| `generateMatrix(n, K=[])` | Dense `0/1` membership matrix, shape `(rows, n)`, one row per subset. `K` defaults to `range(2, n+1)` (skips singletons, includes the full set). |
+| `generateMatrix(n, K=[], n_max=20)` | Dense `0/1` membership matrix, shape `(rows, n)`, one row per subset. `K` defaults to `range(2, n+1)` (skips singletons, includes the full set). `n_max` is the ceiling on `n` -- raise it to go past 20. |
 | `iter_k_masks(n, k)` | Generator of integer bitmasks with exactly `k` set bits -- what everything above is built on. |
 | `cardinality(mask)` | Number of set bits in a mask. |
 | `extract_k_window(matrix, k)` | Pulls the rows for one or more `k` values out of a `generateMatrix` result. Assumes `matrix` was built with the full `K=list(range(1, n))` sweep -- pass that explicitly to `generateMatrix` if you're going to window it, since `generateMatrix`'s own default `K` doesn't match. |
@@ -75,10 +75,21 @@ If `X` is omitted, `ObservationSet` generates integer labels for you
   `itertools.combinations`'s lexicographic order. Same members, different
   sequence -- matters if you're diffing against `itertools` output.
 - **Memory**: `generateMatrix` materializes a dense `(rows, n)` array;
-  `rows` grows like `2^n`. Capped at `n <= 20`. `get_subsets_native` and
+  `rows` grows like `2^n` on the default `K`. `n_max` (default 20) is the
+  ceiling, and it is a courtesy, not a law -- pass a bigger one and the
+  matrix is yours to afford. A narrow `K` stays cheap well past 20
+  (`n=30, K=[3]` is 4,060 rows, under half a megabyte); the default `K` at
+  the same `n` is over a billion rows and will take the process down.
+  Nothing checks this for you. Rows are `uint32`, so `n <= 32` is a hard
+  representation ceiling whatever `n_max` says -- above it the mask
+  overflows with an `OverflowError`. `get_subsets_native` and
   `ObservationSet.get_subsets` don't have this cap for reasonable `k`, but
   the output itself still grows combinatorially -- `comb(n, k)` subsets,
   however you generate them.
+- **Bitmasks without the matrix**: `iter_k_masks(n, k)` has no cap at all
+  and never allocates -- it yields one Python int per subset. If you only
+  need subset *identity*, that mask is it, at `1/n` the footprint of a
+  dense row, and it stays valid past every ceiling above.
 - Full engineering history (why the Rust path exists, what it beat, what
   didn't work) is in [`going_4_rust.md`](going_4_rust.md) and
   [`logs/mvp_changelog.md`](logs/mvp_changelog.md).
